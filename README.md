@@ -1,2 +1,2 @@
 # NinjaFrog
-lock in sigmas
+:(
