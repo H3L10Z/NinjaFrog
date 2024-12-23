@@ -25,7 +25,7 @@ public class EnemySlimeAI : MonoBehaviour
     void Update()
     {
         // Check if grounded (simplified with raycast)
-        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 0.4f, LayerMask.GetMask("Ground"));
+        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 0.5f, LayerMask.GetMask("Ground"));
 
         Debug.Log("Is Grounded: " + isGrounded);
 
