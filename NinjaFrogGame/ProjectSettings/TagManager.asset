@@ -8,6 +8,7 @@ TagManager:
   - Checkpoint
   - BANANAAA
   - Enemy
+  - MovingPlatform
   layers:
   - Default
   - TransparentFX
