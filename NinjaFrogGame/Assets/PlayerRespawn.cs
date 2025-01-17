@@ -8,17 +8,28 @@ public class PlayerRespawn : MonoBehaviour
     [Header("UI References")]
     public TextMeshProUGUI livesText;
     public TextMeshProUGUI coinText;
-
+    public TextMeshProUGUI gameOverText;
+    
     [Header("Player Components")]
     public Animator animator;
     public PlayerMovement playerMovement;
     public Rigidbody2D rb;
+    public SpriteRenderer spriteRenderer;
 
     [Header("Respawn Settings")]
     public string levelSelectorScene = "LevelSelector";
     public float respawnDelay = 1f;
     public float invincibilityDuration = 2f;
     public float fallThreshold = -30f;
+    public float invincibilityFlashRate = 0.15f;
+    public float gameOverDelay = 2.5f;
+
+    [Header("Game Over Animation Settings")]
+    public float textFadeInDuration = 1f;
+    public float textScaleInDuration = 0.5f;
+    public float initialTextScale = 1.5f;
+    public float finalTextScale = 1f;
+    public Color textColor = Color.red;
 
     private Vector3 checkpointPosition;
     private int lives = 3;
@@ -31,6 +42,11 @@ public class PlayerRespawn : MonoBehaviour
     private void Start()
     {
         checkpointPosition = transform.position;
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(false);
+            gameOverText.color = new Color(textColor.r, textColor.g, textColor.b, 0f);
+        }
         UpdateUI();
     }
 
@@ -64,12 +80,12 @@ public class PlayerRespawn : MonoBehaviour
             rb.isKinematic = true;
         }
 
-        // Trigger death animation using the correct parameter name
+        // Trigger death animation
         if (animator != null)
         {
-            animator.SetBool("IsJumping", false);  // Reset jump state
-            animator.SetFloat("Speed", 0f);        // Reset speed
-            animator.SetTrigger("Die");           // Correct trigger for death animation
+            animator.SetBool("IsJumping", false);
+            animator.SetFloat("Speed", 0f);
+            animator.SetTrigger("Die");
         }
 
         lives--;
@@ -77,6 +93,15 @@ public class PlayerRespawn : MonoBehaviour
 
         if (lives <= 0)
         {
+            // Show and animate "YOU DIED" text
+            if (gameOverText != null)
+            {
+                yield return StartCoroutine(ShowGameOverText());
+            }
+            
+            // Wait for the full animation and delay
+            yield return new WaitForSeconds(gameOverDelay);
+            
             SceneManager.LoadScene(levelSelectorScene);
             yield break;
         }
@@ -97,7 +122,7 @@ public class PlayerRespawn : MonoBehaviour
         if (animator != null)
         {
             animator.ResetTrigger("Die");
-            animator.Play("Player_Idle"); // Match your idle animation state name
+            animator.Play("Player_Idle");
         }
 
         // Re-enable movement
@@ -113,14 +138,100 @@ public class PlayerRespawn : MonoBehaviour
     private IEnumerator InvincibilityPeriod()
     {
         isInvincible = true;
+        
+        // Start the flashing coroutine
+        StartCoroutine(FlashWhileInvincible());
+        
         yield return new WaitForSeconds(invincibilityDuration);
+        
         isInvincible = false;
+        
+        // Ensure sprite is fully visible when invincibility ends
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.white;
+        }
+    }
+
+    private IEnumerator FlashWhileInvincible()
+    {
+        if (spriteRenderer == null) yield break;
+
+        Color normalColor = Color.white;
+        Color invincibleColor = new Color(1f, 1f, 1f, 0.5f);
+
+        while (isInvincible)
+        {
+            spriteRenderer.color = invincibleColor;
+            yield return new WaitForSeconds(invincibilityFlashRate);
+            spriteRenderer.color = normalColor;
+            yield return new WaitForSeconds(invincibilityFlashRate);
+        }
+    }
+
+    private IEnumerator ShowGameOverText()
+    {
+        gameOverText.gameObject.SetActive(true);
+        gameOverText.text = "YOU DIED";
+        
+        // Reset text properties
+        gameOverText.color = new Color(textColor.r, textColor.g, textColor.b, 0f);
+        gameOverText.transform.localScale = Vector3.one * initialTextScale;
+
+        // Create a parallel animation for fade and scale
+        StartCoroutine(FadeInText());
+        StartCoroutine(ScaleText());
+
+        // Wait for both animations to complete
+        yield return new WaitForSeconds(Mathf.Max(textFadeInDuration, textScaleInDuration));
+    }
+
+    private IEnumerator FadeInText()
+    {
+        float elapsedTime = 0f;
+        Color startColor = new Color(textColor.r, textColor.g, textColor.b, 0f);
+        Color targetColor = new Color(textColor.r, textColor.g, textColor.b, 1f);
+
+        while (elapsedTime < textFadeInDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float normalizedTime = elapsedTime / textFadeInDuration;
+            
+            // Use smooth step for more dramatic fade
+            float alpha = Mathf.SmoothStep(0f, 1f, normalizedTime);
+            gameOverText.color = Color.Lerp(startColor, targetColor, alpha);
+            
+            yield return null;
+        }
+
+        gameOverText.color = targetColor;
+    }
+
+    private IEnumerator ScaleText()
+    {
+        float elapsedTime = 0f;
+        Vector3 startScale = Vector3.one * initialTextScale;
+        Vector3 targetScale = Vector3.one * finalTextScale;
+
+        while (elapsedTime < textScaleInDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float normalizedTime = elapsedTime / textScaleInDuration;
+            
+            // Use smooth step for more dramatic scaling
+            float scaleProgress = Mathf.SmoothStep(0f, 1f, normalizedTime);
+            gameOverText.transform.localScale = Vector3.Lerp(startScale, targetScale, scaleProgress);
+            
+            yield return null;
+        }
+
+        gameOverText.transform.localScale = targetScale;
     }
 
     private void UpdateUI()
     {
         if (livesText != null) livesText.text = "Lives: " + lives;
-        if (coinText != null) coinText.text = "Coins: " + coins;
+        if (coinText != null) coinText.text = "Cherry: " + coins;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
