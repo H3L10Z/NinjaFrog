@@ -1,153 +1,183 @@
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro; // Ensure TextMeshPro is imported
 using UnityEngine.SceneManagement;
 
 public class PlayerRespawn : MonoBehaviour
 {
-    private Vector3 respawnPoint;  // The player's current respawn position
-    public string levelSelectorSceneName = "LevelSelector"; // Name of the Level Selector scene
+    public TextMeshProUGUI livesText;
+    public TextMeshProUGUI coinText;
+    public Animator playerAnimator; // Reference to the player's Animator
 
-    public int maxLives = 3; // Maximum lives per level
-    private int currentLives;
+    private Vector3 respawnPoint; // The player's respawn position
+    public string levelSelectorSceneName = "LevelSelector"; // Level selector scene
 
-    public Text livesText; // Reference to the UI Text element for lives display
+    private int lives = 3;
+    private int coins = 0;
 
     private bool isOnCooldown = false; // Cooldown flag
-    public float deathCooldown = 1.0f; // Cooldown duration in seconds
+    public float cooldownTime = 1f; // Cooldown duration
+    private bool isInvulnerable = false; // Invulnerability flag
+    public float invulnerabilityTime = 2f; // Time in seconds for invulnerability after respawn
+    private bool isFalling = false; // Flag to track if the player is falling
+
+    private float fallThreshold = -20f; // Y position where the player dies if they fall below
 
     void Start()
     {
-        // Set the initial respawn point to the player's starting position
         respawnPoint = transform.position;
-
-        // Initialize lives
-        currentLives = maxLives;
-
-        // Display the initial lives count
         UpdateLivesUI();
-    }
-
-    void Update()
-    {
-        // Check if the player falls below a certain Y level
-        if (transform.position.y < -30)
-        {
-            HandleDeath();
-        }
-    }
-
-    public void Respawn()
-    {
-        // Move the player to the last checkpoint (respawn point)
-        transform.position = respawnPoint;
-        Debug.Log("Respawning player to: " + respawnPoint);
-    }
-
-    private void HandleDeath()
-    {
-        // Check if the player is on cooldown
-        if (isOnCooldown)
-        {
-            Debug.Log("Player is on cooldown. Ignoring death.");
-            return;
-        }
-
-        // Start the cooldown
-        StartCoroutine(DeathCooldown());
-
-        // Decrement lives
-        currentLives--;
-
-        if (currentLives > 0)
-        {
-            Debug.Log("Player died. Lives remaining: " + currentLives);
-            UpdateLivesUI();
-            Respawn();
-        }
-        else
-        {
-            Debug.Log("No lives remaining. Returning to level selector.");
-            UpdateLivesUI(); // Update UI to show 0 lives before transition
-            ReturnToLevelSelector();
-        }
+        UpdateCoinsUI();
     }
 
     private void UpdateLivesUI()
     {
         if (livesText != null)
         {
-            // Update the UI text to reflect current lives
-            livesText.text = "Lives: " + currentLives;
-            Debug.Log("Updating Lives UI to: " + currentLives);
-        }
-        else
-        {
-            Debug.LogError("LivesText is not assigned in the Inspector! Please assign the LivesText UI element.");
+            livesText.text = "Lives: " + lives;
+            Debug.Log("Updating Lives UI to: " + lives);
         }
     }
 
-    private void ReturnToLevelSelector()
+    private void UpdateCoinsUI()
     {
-        // Load the Level Selector scene
-        SceneManager.LoadScene(levelSelectorSceneName);
+        if (coinText != null)
+        {
+            coinText.text = "Coins: " + coins;
+            Debug.Log("Updating Coins UI to: " + coins);
+        }
+    }
+
+    public void HandleDeath()
+    {
+        if (isOnCooldown || isInvulnerable || isFalling) return; // Prevent multiple deaths
+
+        Debug.Log("Player hit a hazard. Triggering HandleDeath.");
+
+        // Trigger death animation
+        if (playerAnimator != null)
+        {
+            playerAnimator.SetTrigger("Die"); // Make sure you set up a "Die" trigger in the Animator
+        }
+
+        lives--;
+
+        if (lives <= 0)
+        {
+            SceneManager.LoadScene(levelSelectorSceneName); // Load level selector when no lives left
+        }
+        else
+        {
+            // Start cooldown before respawning
+            StartCoroutine(DeathCooldown());
+        }
+
+        StartCoroutine(Cooldown());
     }
 
     private System.Collections.IEnumerator DeathCooldown()
     {
-        // Set the cooldown flag to true
+        // Play death animation for a short time before respawning
+        float deathAnimationDuration = 1f; // Adjust this time to match the death animation length
+        yield return new WaitForSeconds(deathAnimationDuration); // Wait for the death animation to play
+
+        // Reset death trigger and transition to idle animation
+        playerAnimator.ResetTrigger("Die"); // Reset the "Die" trigger to stop death animation
+        playerAnimator.SetTrigger("Idle"); // Transition to idle or another state after death animation
+
+        // Respawn the player at the last checkpoint
+        transform.position = respawnPoint;
+        UpdateLivesUI();
+
+        // Enable invulnerability for a short time after respawning
+        isInvulnerable = true;
+        yield return new WaitForSeconds(invulnerabilityTime); // Wait for the invulnerability time to end
+        isInvulnerable = false; // Disable invulnerability after the time is over
+    }
+
+    private System.Collections.IEnumerator Cooldown()
+    {
         isOnCooldown = true;
-
-        // Wait for the cooldown duration
-        yield return new WaitForSeconds(deathCooldown);
-
-        // Reset the cooldown flag
+        yield return new WaitForSeconds(cooldownTime);
         isOnCooldown = false;
     }
 
-    void OnTriggerEnter2D(Collider2D other)
+    private void OnTriggerEnter2D(Collider2D other)
     {
-        // Check if the player collided with a checkpoint
         if (other.CompareTag("Checkpoint"))
         {
-            Checkpoint checkpoint = other.GetComponent<Checkpoint>();
-            if (checkpoint != null && checkpoint.isLastCheckpoint)
-            {
-                // If it's the last checkpoint, handle animation and transition
-                HandleLastCheckpoint(other.GetComponentInChildren<Animator>());
-                return;
-            }
-
-            // Update the respawn point to the checkpoint's position
             respawnPoint = other.transform.position;
 
-            // Find the Animator on the checkpoint and play the activation animation
             Animator checkpointAnimator = other.GetComponentInChildren<Animator>();
             if (checkpointAnimator != null)
             {
                 checkpointAnimator.SetTrigger("ActivateFlag");
             }
         }
+        else if (other.CompareTag("Hazard") && !isInvulnerable && !isFalling) // Check if player is invulnerable
+        {
+            HandleDeath(); // Only trigger death if player is not invulnerable
+        }
+        else if (other.CompareTag("Coin"))
+        {
+            Coin coin = other.GetComponent<Coin>();
+            if (coin != null && !coin.isPickedUp) // Prevent multiple pickups
+            {
+                coin.PickUp();
+                coins++;
+                UpdateCoinsUI();
+            }
+        }
     }
 
-    private void HandleLastCheckpoint(Animator checkpointAnimator)
+    void Update()
     {
-        // Play the checkpoint's animation if it exists
-        if (checkpointAnimator != null)
+        // Check if the player falls below the fall threshold (Y position)
+        if (transform.position.y < fallThreshold && !isFalling)
         {
-            checkpointAnimator.SetTrigger("ActivateFlag");
+            isFalling = true; // Mark the player as falling
+            HandleFall(); // Call HandleFall instead of HandleDeath for falling
+        }
+    }
+
+    // New method to handle falling
+    private void HandleFall()
+    {
+        if (lives > 0)
+        {
+            lives--; // Decrease lives when the player falls
+            UpdateLivesUI();
+            StartCoroutine(RespawnAfterFall());
+        }
+        else
+        {
+            SceneManager.LoadScene(levelSelectorSceneName); // Go to level selector if no lives are left
+        }
+    }
+
+    // Coroutine to respawn the player after falling
+    private System.Collections.IEnumerator RespawnAfterFall()
+    {
+        // Play death animation briefly
+        if (playerAnimator != null)
+        {
+            playerAnimator.SetTrigger("Die");
         }
 
-        // Delay the transition to the Level Selector after animation
-        StartCoroutine(LastCheckpointDelay());
-    }
+        // Wait for a short time before respawning
+        float fallRespawnDelay = 1f; // Delay before respawning
+        yield return new WaitForSeconds(fallRespawnDelay);
 
-    private System.Collections.IEnumerator LastCheckpointDelay()
-    {
-        // Wait for 2-3 seconds (adjust this duration to match the animation length)
-        float animationDuration = 2.8f; // Adjust this to match your animation length
-        yield return new WaitForSeconds(animationDuration);
+        // Reset death animation and respawn player
+        if (playerAnimator != null)
+        {
+            playerAnimator.ResetTrigger("Die");
+            playerAnimator.SetTrigger("Idle"); // Transition to idle state after death
+        }
 
-        // Load the Level Selector scene
-        SceneManager.LoadScene(levelSelectorSceneName);
+        transform.position = respawnPoint; // Respawn the player at the last checkpoint
+        isFalling = false; // Reset falling state
+        isInvulnerable = true; // Set invulnerability after respawn
+        yield return new WaitForSeconds(invulnerabilityTime); // Wait for invulnerability time
+        isInvulnerable = false; // Disable invulnerability after the time is over
     }
 }

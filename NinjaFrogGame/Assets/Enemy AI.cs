@@ -15,18 +15,25 @@ public class EnemySlimeAI : MonoBehaviour
     private bool isGrounded = false;
     private float jumpTimer = 0f;
 
+    // Add reference to PlayerRespawn script
+    public PlayerRespawn playerRespawn; // Reference to the PlayerRespawn script to handle player death
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         player = GameObject.FindGameObjectWithTag("Player").transform; // Ensure the player has the "Player" tag.
+
+        if (playerRespawn == null)
+        {
+            Debug.LogWarning("PlayerRespawn reference not set on the slime!");
+        }
     }
 
     void Update()
     {
         // Check if grounded (simplified with raycast)
         isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 0.5f, LayerMask.GetMask("Ground"));
-
 
         // Handle jumping behavior
         jumpTimer += Time.deltaTime;
@@ -92,6 +99,22 @@ public class EnemySlimeAI : MonoBehaviour
         {
             animator.SetBool("isJumping", false);
             animator.SetBool("isFalling", false);
+        }
+    }
+
+    // Detect when the slime collides with the player
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.collider.CompareTag("Player"))
+        {
+            // If the slime collides with the player, trigger death
+            Debug.Log("Slime touched player! Triggering death.");
+            
+            // Call the HandleDeath method from the PlayerRespawn script
+            if (playerRespawn != null)
+            {
+                playerRespawn.HandleDeath(); // Handle player death immediately
+            }
         }
     }
 

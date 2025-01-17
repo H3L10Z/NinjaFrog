@@ -6,9 +6,11 @@ TagManager:
   tags:
   - FallDetector
   - Checkpoint
-  - BANANAAA
   - Enemy
   - MovingPlatform
+  - Coin
+  - BANANAAA
+  - Hazard
   layers:
   - Default
   - TransparentFX
