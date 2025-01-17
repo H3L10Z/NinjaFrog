@@ -1,26 +1,31 @@
 using UnityEngine;
-using TMPro; // Ensure TextMeshPro is imported
+using TMPro;
 using UnityEngine.SceneManagement;
 
 public class PlayerRespawn : MonoBehaviour
 {
     public TextMeshProUGUI livesText;
     public TextMeshProUGUI coinText;
-    public Animator playerAnimator; // Reference to the player's Animator
+    public Animator playerAnimator;
+    public MonoBehaviour movementScript; // Reference to the player's movement script
+    public Rigidbody2D playerRigidbody; // Reference to the player's Rigidbody2D (for physics)
 
-    private Vector3 respawnPoint; // The player's respawn position
-    public string levelSelectorSceneName = "LevelSelector"; // Level selector scene
+    private Vector3 respawnPoint;
+    public string levelSelectorSceneName = "LevelSelector";
 
     private int lives = 3;
     private int coins = 0;
 
-    private bool isOnCooldown = false; // Cooldown flag
-    public float cooldownTime = 1f; // Cooldown duration
-    private bool isInvulnerable = false; // Invulnerability flag
-    public float invulnerabilityTime = 2f; // Time in seconds for invulnerability after respawn
-    private bool isFalling = false; // Flag to track if the player is falling
+    private bool isOnCooldown = false;
+    public float cooldownTime = 1f;
+    private bool isInvulnerable = false;
+    public float invulnerabilityTime = 2f;
+    private bool isFalling = false;
 
-    private float fallThreshold = -20f; // Y position where the player dies if they fall below
+    private float fallThreshold = -30f;
+    public float deathAnimationDuration = 1f;
+
+    private bool isMovementLocked = false; // New flag to block movement
 
     void Start()
     {
@@ -34,7 +39,6 @@ public class PlayerRespawn : MonoBehaviour
         if (livesText != null)
         {
             livesText.text = "Lives: " + lives;
-            Debug.Log("Updating Lives UI to: " + lives);
         }
     }
 
@@ -43,31 +47,28 @@ public class PlayerRespawn : MonoBehaviour
         if (coinText != null)
         {
             coinText.text = "Coins: " + coins;
-            Debug.Log("Updating Coins UI to: " + coins);
         }
     }
 
     public void HandleDeath()
     {
-        if (isOnCooldown || isInvulnerable || isFalling) return; // Prevent multiple deaths
+        if (isOnCooldown || isInvulnerable || isFalling) return;
 
-        Debug.Log("Player hit a hazard. Triggering HandleDeath.");
+        LockMovement(); // Block movement
 
-        // Trigger death animation
         if (playerAnimator != null)
         {
-            playerAnimator.SetTrigger("Die"); // Make sure you set up a "Die" trigger in the Animator
+            playerAnimator.SetTrigger("Die");
         }
 
         lives--;
 
         if (lives <= 0)
         {
-            SceneManager.LoadScene(levelSelectorSceneName); // Load level selector when no lives left
+            SceneManager.LoadScene(levelSelectorSceneName);
         }
         else
         {
-            // Start cooldown before respawning
             StartCoroutine(DeathCooldown());
         }
 
@@ -76,22 +77,18 @@ public class PlayerRespawn : MonoBehaviour
 
     private System.Collections.IEnumerator DeathCooldown()
     {
-        // Play death animation for a short time before respawning
-        float deathAnimationDuration = 1f; // Adjust this time to match the death animation length
-        yield return new WaitForSeconds(deathAnimationDuration); // Wait for the death animation to play
+        yield return new WaitForSeconds(deathAnimationDuration);
 
-        // Reset death trigger and transition to idle animation
-        playerAnimator.ResetTrigger("Die"); // Reset the "Die" trigger to stop death animation
-        playerAnimator.SetTrigger("Idle"); // Transition to idle or another state after death animation
+        playerAnimator.ResetTrigger("Die");
+        playerAnimator.SetTrigger("Idle");
 
-        // Respawn the player at the last checkpoint
         transform.position = respawnPoint;
         UpdateLivesUI();
 
-        // Enable invulnerability for a short time after respawning
         isInvulnerable = true;
-        yield return new WaitForSeconds(invulnerabilityTime); // Wait for the invulnerability time to end
-        isInvulnerable = false; // Disable invulnerability after the time is over
+        UnlockMovement(); // Allow movement again
+        yield return new WaitForSeconds(invulnerabilityTime);
+        isInvulnerable = false;
     }
 
     private System.Collections.IEnumerator Cooldown()
@@ -113,14 +110,14 @@ public class PlayerRespawn : MonoBehaviour
                 checkpointAnimator.SetTrigger("ActivateFlag");
             }
         }
-        else if (other.CompareTag("Hazard") && !isInvulnerable && !isFalling) // Check if player is invulnerable
+        else if (other.CompareTag("Hazard") && !isInvulnerable && !isFalling)
         {
-            HandleDeath(); // Only trigger death if player is not invulnerable
+            HandleDeath();
         }
         else if (other.CompareTag("Coin"))
         {
             Coin coin = other.GetComponent<Coin>();
-            if (coin != null && !coin.isPickedUp) // Prevent multiple pickups
+            if (coin != null && !coin.isPickedUp)
             {
                 coin.PickUp();
                 coins++;
@@ -134,50 +131,81 @@ public class PlayerRespawn : MonoBehaviour
         // Check if the player falls below the fall threshold (Y position)
         if (transform.position.y < fallThreshold && !isFalling)
         {
-            isFalling = true; // Mark the player as falling
-            HandleFall(); // Call HandleFall instead of HandleDeath for falling
+            isFalling = true;
+            HandleFall();
         }
     }
 
-    // New method to handle falling
     private void HandleFall()
     {
         if (lives > 0)
         {
-            lives--; // Decrease lives when the player falls
+            lives--;
             UpdateLivesUI();
             StartCoroutine(RespawnAfterFall());
         }
         else
         {
-            SceneManager.LoadScene(levelSelectorSceneName); // Go to level selector if no lives are left
+            SceneManager.LoadScene(levelSelectorSceneName);
         }
     }
 
-    // Coroutine to respawn the player after falling
     private System.Collections.IEnumerator RespawnAfterFall()
     {
-        // Play death animation briefly
+        LockMovement();
+
         if (playerAnimator != null)
         {
             playerAnimator.SetTrigger("Die");
         }
 
-        // Wait for a short time before respawning
-        float fallRespawnDelay = 1f; // Delay before respawning
-        yield return new WaitForSeconds(fallRespawnDelay);
+        yield return new WaitForSeconds(deathAnimationDuration);
 
-        // Reset death animation and respawn player
+        // Reset the animation state to Idle after death animation ends
         if (playerAnimator != null)
         {
             playerAnimator.ResetTrigger("Die");
-            playerAnimator.SetTrigger("Idle"); // Transition to idle state after death
+            playerAnimator.SetTrigger("Idle"); // Ensure player transitions to idle after death
         }
 
-        transform.position = respawnPoint; // Respawn the player at the last checkpoint
-        isFalling = false; // Reset falling state
-        isInvulnerable = true; // Set invulnerability after respawn
-        yield return new WaitForSeconds(invulnerabilityTime); // Wait for invulnerability time
-        isInvulnerable = false; // Disable invulnerability after the time is over
+        transform.position = respawnPoint;
+        isFalling = false;
+        isInvulnerable = true;
+        UnlockMovement();
+        yield return new WaitForSeconds(invulnerabilityTime);
+        isInvulnerable = false;
+    }
+
+    private void LockMovement()
+    {
+        isMovementLocked = true;
+
+        if (movementScript != null)
+        {
+            movementScript.enabled = false; // Disable movement script
+        }
+
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.velocity = Vector2.zero; // Stop physics movement
+        }
+    }
+
+    private void UnlockMovement()
+    {
+        isMovementLocked = false;
+
+        if (movementScript != null)
+        {
+            movementScript.enabled = true; // Re-enable movement script
+        }
+    }
+
+    void FixedUpdate()
+    {
+        if (isMovementLocked && playerRigidbody != null)
+        {
+            playerRigidbody.velocity = Vector2.zero; // Continuously prevent movement
+        }
     }
 }

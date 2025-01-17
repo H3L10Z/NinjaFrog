@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 8338502088102776293}
   - component: {fileID: -2761572075699248958}
   m_Layer: 0
-  m_Name: Coin
+  m_Name: Cherry
   m_TagString: Coin
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
