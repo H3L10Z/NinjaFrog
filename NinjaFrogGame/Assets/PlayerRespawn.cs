@@ -54,8 +54,11 @@ public class PlayerRespawn : MonoBehaviour
     {
         if (isOnCooldown || isInvulnerable || isFalling) return;
 
-        LockMovement(); // Block movement
+        // Lock movement and set the invulnerable flag
+        LockMovement();
+        isInvulnerable = true;
 
+        // Trigger death animation
         if (playerAnimator != null)
         {
             playerAnimator.SetTrigger("Die");
@@ -79,16 +82,18 @@ public class PlayerRespawn : MonoBehaviour
     {
         yield return new WaitForSeconds(deathAnimationDuration);
 
+        // After death animation ends, reset animation and respawn
         playerAnimator.ResetTrigger("Die");
         playerAnimator.SetTrigger("Idle");
 
         transform.position = respawnPoint;
         UpdateLivesUI();
 
-        isInvulnerable = true;
-        UnlockMovement(); // Allow movement again
+        // After a brief invulnerability period, allow the player to take damage again
         yield return new WaitForSeconds(invulnerabilityTime);
         isInvulnerable = false;
+
+        UnlockMovement();
     }
 
     private System.Collections.IEnumerator Cooldown()
@@ -170,10 +175,7 @@ public class PlayerRespawn : MonoBehaviour
 
         transform.position = respawnPoint;
         isFalling = false;
-        isInvulnerable = true;
         UnlockMovement();
-        yield return new WaitForSeconds(invulnerabilityTime);
-        isInvulnerable = false;
     }
 
     private void LockMovement()
@@ -208,4 +210,14 @@ public class PlayerRespawn : MonoBehaviour
             playerRigidbody.velocity = Vector2.zero; // Continuously prevent movement
         }
     }
+
+    // Public property to access the isInvulnerable flag
+    public bool IsInvulnerable
+    {
+        get { return isInvulnerable; }
+    }
 }
+
+
+
+

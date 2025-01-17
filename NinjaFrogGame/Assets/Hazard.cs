@@ -6,9 +6,15 @@ public class Hazard : MonoBehaviour
     {
         if (collision.CompareTag("Player"))
         {
-            Debug.Log("Player hit a hazard. Triggering HandleDeath.");
-            collision.GetComponent<PlayerRespawn>()?.HandleDeath();
+            // Ensure the player is not in the middle of a death animation or invulnerable state
+            PlayerRespawn playerRespawn = collision.GetComponent<PlayerRespawn>();
+            if (playerRespawn != null && !playerRespawn.IsInvulnerable)
+            {
+                Debug.Log("Player hit a hazard. Triggering HandleDeath.");
+                playerRespawn.HandleDeath();
+            }
         }
     }
 }
+
 
