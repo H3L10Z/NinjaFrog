@@ -57829,9 +57829,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ace34a9d9fdf12f4286850aa9238da0c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  runSpeed: 40
   controller: {fileID: 1207562691}
   animator: {fileID: 1207562696}
-  runSpeed: 40
 --- !u!58 &1207562694
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -57947,13 +57947,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   livesText: {fileID: 1312992697}
   coinText: {fileID: 975354115}
-  playerAnimator: {fileID: 1207562696}
-  movementScript: {fileID: 1207562691}
-  playerRigidbody: {fileID: 1207562692}
-  levelSelectorSceneName: LevelSelector
-  cooldownTime: 0.1
-  invulnerabilityTime: 1
-  deathAnimationDuration: 0.5
+  animator: {fileID: 1207562696}
+  playerMovement: {fileID: 1207562693}
+  rb: {fileID: 1207562692}
+  levelSelectorScene: LevelSelector
+  respawnDelay: 0.5
+  invincibilityDuration: 1
+  fallThreshold: -30
 --- !u!1001 &1295302869
 PrefabInstance:
   m_ObjectHideFlags: 0
