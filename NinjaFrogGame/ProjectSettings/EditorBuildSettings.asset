@@ -17,4 +17,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/DEMO.unity
     guid: 22d0875a4e5e8314caa6149bba8229e0
+  - enabled: 1
+    path: Assets/Level1.unity
+    guid: 497b8af6298694441b06166be2c4b7eb
   m_configObjects: {}
